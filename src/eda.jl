@@ -22,3 +22,6 @@ gr(size = (1200, 1000))
 
 
 @df df_num cornerplot(cols(1:5),)
+
+
+

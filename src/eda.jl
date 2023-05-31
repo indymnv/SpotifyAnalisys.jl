@@ -1,27 +1,78 @@
 using DataFrames
-using Plots
+using Tidier
+using AlgebraOfGraphics
+using CairoMakie
 using CSV
 using StatsBase
-using StatsPlots
 using Statistics
 
 # read the file into a dataframe
- df = DataFrame(CSV.File("./Spotify_Youtube.csv"))
+df = DataFrame(CSV.File("./Spotify_Youtube.csv"))
 
-# create a function to perform feature engineering with one hot encoder
- scatter(df.Energy, df.Loudness)
+#Totak of columns
+names(df)
 
- plot([histogram(df[:, col],label = col, bins = 10 ) for col in ["Danceability", "Energy","Key","Loudness","Speechiness","Acousticness","Instrumentalness","Liveness","Valence","Tempo","Duration_ms","Views","Likes","Comments"]]...)
+#Describe the columns
+describe(df)
 
-# crete a pairplot function will receive a dataframe and will create a plot with several scatterplot to cross information
-df_num = dropmissing(df[:,["Danceability", "Energy","Key","Loudness","Speechiness","Acousticness","Instrumentalness","Liveness","Valence","Tempo","Duration_ms","Views","Likes","Comments"]])
+#Number of rows and columns
+size(df)
+
+#Number of artista
+@chain df begin
+	@group_by(Artist)
+	@summarise(n=nrow())
+end
+
+# Why we have 10 artist for each --> Different songs for each
+@chain df begin
+	@filter(Artist=="Ankit Tiwari")
+	@select(Duration_ms)
+	@mutate(time_in_min = (Duration_ms/60_000))
+end
+
+# Number of songs with type albums --> Album 
+@chain df begin
+	@group_by(Album_type)
+	@summarise(n=nrow())
+	@mutate(percentage = (n/20_718))
+	@select(Album_type, percentage)
+end
+
+# Ranking of songs with more likes/views/coments 
+@chain dropmissing(df, [:Views, :Likes, :Comments]) begin
+	@arrange(desc(Views),)
+	@select(Track,Artist, Views, Likes, Comments)
+	@slice(1:12)
+end
 
 
-gr(size = (1200, 1000))
-@df df_num corrplot(cols(1:9), grid = true)
+#Ranking of artist with the average longest songs
+@chain dropmissing(df, [:Duration_ms]) begin
+	@group_by(Artist)
+	@summarise(time_avg_min= mean(Duration_ms)/60_000)
+	@arrange(desc(time_avg_min))
+	@slice(1:10)
+#	@mutate(time_avg = mean(Duration_ms))
+end
 
+# There are some outliers in specific songs and may affect the ranking, let's use the median
 
-@df df_num cornerplot(cols(1:5),)
+#Ranking of artist with the median longest songs
+@chain dropmissing(df, [:Duration_ms]) begin
+	@group_by(Artist)
+	@summarise(time_avg_min= median(Duration_ms)/60_000)
+	@arrange(desc(time_avg_min))
+	@slice(1:10)
+#	@mutate(time_avg = mean(Duration_ms))
+end
 
+#The ranking is completely different because of this distorion in specific songs.
+
+#Histogram for tie duration
+keep = map(!ismissing, df.Energy)
+plt = data(df[keep,:]) * mapping(:Energy)*  histogram(bins =50)
+fg = draw(plt)
+save("hist.png", fg)
 
 

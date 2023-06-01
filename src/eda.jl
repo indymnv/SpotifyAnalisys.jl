@@ -26,9 +26,8 @@ end
 
 # Why we have 10 artist for each --> Different songs for each
 @chain df begin
-	@filter(Artist=="Ankit Tiwari")
-	@select(Duration_ms)
-	@mutate(time_in_min = (Duration_ms/60_000))
+	@filter(Artist=="Claudio Abbado")
+	@select(Artist, Track)
 end
 
 # Number of songs with type albums --> Album 
@@ -68,6 +67,17 @@ end
 end
 
 #The ranking is completely different because of this distorion in specific songs.
+
+#Ranking with  Artist with the longest title song names
+@chain df begin
+	@mutate(lenght_title_song = length.(Track))
+	@group_by(Artist)
+	@summarise(median_length_title = median(lenght_title_song))
+	@arrange(desc(median_length_title))
+	@select(Artist, median_length_title)
+end
+
+# Create An stratification for amount of likes by percentile - and then compare them between 
 
 #Histogram for tie duration
 keep = map(!ismissing, df.Energy)

@@ -1,10 +1,10 @@
 using DataFrames
 using Tidier
-using AlgebraOfGraphics
-using CairoMakie
 using CSV
 using StatsBase
 using Statistics
+using Plots
+using StatsPlots
 
 # read the file into a dataframe
 df = DataFrame(CSV.File("./Spotify_Youtube.csv"))
@@ -77,12 +77,75 @@ end
 	@select(Artist, median_length_title)
 end
 
-# Create An stratification for amount of likes by percentile - and then compare them between 
+#Pivot table
 
-#Histogram for tie duration
-keep = map(!ismissing, df.Energy)
-plt = data(df[keep,:]) * mapping(:Energy)*  histogram(bins =50)
-fg = draw(plt)
-save("hist.png", fg)
+#Select amount of songs under 3 minutes
 
+#Histogram for tie durationa
+
+s = plot([histogram(df[:, col],label = col, bins = 20 ) for col in ["Energy", "Key", "Loudness","Speechiness", "Acousticness","Instrumentalness","Liveness", "Valence","Tempo", "Duration_ms",]]...)
+
+savefig(s, "./img/hist_var.png")
+
+#Let's make andja
+#Totally skew distributions for likes, coments and Views
+s = plot([histogram(df[:, col],label = col, bins = 20 ) for col in ["Views", "Likes", "Comments",]]...)
+
+boxplot(skipmissing(df.Likes))
+
+function calculate_upper_fence(elements_array)
+	quantile_3 = quantile(elements_array)[3]
+	quantile_1 = quantile(elements_array)[1]
+	IQR = quantile_3 - quantile_1
+	boundary = quantile_3 + 1.5*IQR
+	return boundary
+end
+
+upper_bound = calculate_upper_fence(collect(skipmissing(df.Likes)))
+
+df.succesful_song =  df.Likes .> upper_bound
+
+#Fill the missings with the value 0
+df.Likes = coalesce.(df.Likes, 0)
+
+@. df.succesful_song = ifelse(df.Likes.> upper_bound, 1.0, 0.0)
+
+#scatterplot for comparing with Like
+
+Plots.scatter(df.Speechiness, df.succesful_song, group = df.succesful_song)
+
+size(df)
+df_filtered = dropmissing(df, :Likes) #delete just one row
+size(df_filtered)
+
+@chain df_filtered begin
+	@group_by(succesful_song)
+	@summarize(n = nrow())
+end
+
+@df dropmissing(df_filtered, :Energy)  density(:Energy, group = (:succesful_song),)
+
+p1 = @df dropmissing(df_filtered, :Energy)  density(:Energy, group = (:succesful_song),)
+p2 = @df dropmissing(df_filtered, :Key)  density(:Key, group = (:succesful_song),)
+p3 = @df dropmissing(df_filtered, :Loudness)  density(:Loudness, group = (:succesful_song),)
+p4 = @df dropmissing(df_filtered, :Speechiness)  density(:Speechiness, group = (:succesful_song),)
+p5 = @df dropmissing(df_filtered, :Acousticness)  density(:Acousticness, group = (:succesful_song),)
+p6 = @df dropmissing(df_filtered, :Instrumentalness)  density(:Instrumentalness, group = (:succesful_song),)
+
+plot(p1, p2, p3, p4, p5, p6, layout=(3,2), legend=true)
+
+
+s = plot([Plots.scatter(df_filtered[:, col], df_filtered.succesful_song, label = col, bins = 20 ,) for col in ["Energy", "Key", "Loudness","Speechiness", "Acousticness","Instrumentalness","Liveness", "Valence","Tempo", "Duration_ms",]]...)
+
+@chain df_filtered begin
+	@group_by(succesful_song)
+	@summarize(n = nrow())
+end
+
+columns = ["Energy", "Key", "Loudness","Speechiness", "Acousticness","Instrumentalness","Liveness", "Valence","Tempo", "Duration_ms","succesful_song"]
+
+
+df_experiment =df[!,columns] 
+
+CSV.write("df_experiment.csv", df_experiment)
 
